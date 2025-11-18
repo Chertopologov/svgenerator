@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Генератор резюме</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.9.3/dist/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Генератор резюме</h1>
+    <div class="template-icons" id="templateIcons">
+      <button class="tmpl-btn active" data-tmpl="template-1" title="Шаблон 1">A</button>
+      <button class="tmpl-btn" data-tmpl="template-2" title="Шаблон 2">B</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="controls" id="controls">
+      <h2>Данные резюме</h2>
+      <form id="resumeForm" onsubmit="return false;">
+        <div class="block personal">
+          <h3>Личные данные</h3>
+          <div class="photo-row">
+            <div class="photo-drop" id="photoDrop">
+              <img id="photoPreview" alt="Фото" />
+              <input type="file" id="photoInput" accept="image/*">
+            </div>
+            <div class="personal-fields">
+              <input type="text" id="fullName" placeholder="ФИО">
+              <div class="two-cols">
+                <input type="date" id="dob" placeholder="Дата рождения">
+                <input type="text" id="citizenship" placeholder="Гражданство">
+              </div>
+              <input type="text" id="city" placeholder="Город проживания">
+
+              <div class="mini-block">
+                <input type="tel" id="phone" placeholder="Телефон">
+                <input type="email" id="email" placeholder="Email">
+                <div id="socials"></div>
+                <button class="small" id="addSocial">+ соцсеть</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="block education">
+          <h3>Образование <button class="small" id="addEducation">+ добавить</button></h3>
+          <div id="educationList"></div>
+        </div>
+
+        <div class="block experience">
+          <h3>Опыт работы <button class="small" id="addExperience">+ добавить</button></h3>
+          <div id="experienceList"></div>
+        </div>
+
+        <div class="block skills">
+          <h3>Навыки</h3>
+          <textarea id="skills" placeholder="Например: языки, программирование, личные качества"></textarea>
+        </div>
+
+        <div class="block about">
+          <h3>О себе</h3>
+          <textarea id="about" placeholder="Коротко о себе"></textarea>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="exportPdf" class="primary">Скачать PDF</button>
+          <button type="button" id="exportDoc">Скачать .doc</button>
+        </div>
+      </form>
+    </section>
+
+    <aside class="preview-wrap">
+      <div class="preview-top">
+        <h2>Превью</h2>
+        <div class="scroll-controls">
+          <button id="scrollUp">▲</button>
+          <button id="scrollDown">▼</button>
+        </div>
+      </div>
+      <div id="resumePreview" class="resume-preview template-1" contenteditable="false"></div>
+    </aside>
+  </main>
+
+  <footer class="footer">Одностраничный генератор резюме — простая версия</footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
