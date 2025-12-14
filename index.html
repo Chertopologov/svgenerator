@@ -4,87 +4,399 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Генератор резюме</title>
+
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.9.3/dist/html2pdf.bundle.min.js"></script>
+
+  <!-- Flatpickr (month/year picker) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/style.css">
+
+  <!-- PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js" crossorigin="anonymous"></script>
+
+  <!-- DOCX + FileSaver -->
+  <script src="https://unpkg.com/docx@9.5.1/dist/index.iife.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
+
+  <!-- Flatpickr JS -->
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/index.js"></script>
 </head>
+
 <body>
   <header class="topbar">
-    <h1>Генератор резюме</h1>
-    <div class="template-icons" id="templateIcons">
-      <button class="tmpl-btn active" data-tmpl="template-1" title="Шаблон 1">A</button>
-      <button class="tmpl-btn" data-tmpl="template-2" title="Шаблон 2">B</button>
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <div class="title">Генератор резюме</div>
+        <div class="subtitle">Заполнение → Просмотр шаблонов → Экспорт</div>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <button class="btn btn-ghost" id="goStep1" type="button">Заполнение</button>
+      <button class="btn btn-primary" id="goStep2" type="button">Просмотр</button>
     </div>
   </header>
 
-  <main class="container">
-    <section class="controls" id="controls">
-      <h2>Данные резюме</h2>
-      <form id="resumeForm" onsubmit="return false;">
-        <div class="block personal">
-          <h3>Личные данные</h3>
-          <div class="photo-row">
-            <div class="photo-drop" id="photoDrop">
-              <img id="photoPreview" alt="Фото" />
-              <input type="file" id="photoInput" accept="image/*">
-            </div>
-            <div class="personal-fields">
-              <input type="text" id="fullName" placeholder="ФИО">
-              <div class="two-cols">
-                <input type="date" id="dob" placeholder="Дата рождения">
-                <input type="text" id="citizenship" placeholder="Гражданство">
-              </div>
-              <input type="text" id="city" placeholder="Город проживания">
+  <!-- STEP 1 -->
+  <main class="page step step-1" id="step1">
+    <div class="center-wrap">
+      <div class="hero">
+        <div class="hero-title">Заполните данные для резюме</div>
+        <div class="hero-sub">Пустые поля автоматически скрываются в итоговом резюме.</div>
+      </div>
 
-              <div class="mini-block">
-                <input type="tel" id="phone" placeholder="Телефон">
-                <input type="email" id="email" placeholder="Email">
-                <div id="socials"></div>
-                <button class="small" id="addSocial">+ соцсеть</button>
+      <section class="card form-card">
+        <div class="card-head">
+          <div class="card-title">Данные</div>
+        </div>
+
+        <form id="resumeForm" onsubmit="return false;">
+          <div class="accordion">
+
+            <details open class="acc">
+              <summary class="acc-head">
+                <span>Основная информация</span>
+                <span class="acc-hint">ФИО, должность, условия</span>
+              </summary>
+              <div class="acc-body">
+                <div class="photo-row">
+                  <div class="photo-drop" id="photoDrop" title="Загрузить фото">
+                    <img id="photoPreview" alt="Фото" style="display:none" />
+                    <input type="file" id="photoInput" accept="image/*">
+                    <div class="photo-hint" id="photoHint">Нажмите, чтобы загрузить фото</div>
+                  </div>
+
+                  <div class="fields">
+                    <label class="field">
+                      <span>ФИО</span>
+                      <input type="text" id="fullName" placeholder="Например: Петров Петр Иванович">
+                    </label>
+
+                    <label class="field">
+                      <span>Должность (цель)</span>
+                      <input type="text" id="position" placeholder="Например: Frontend-разработчик">
+                    </label>
+
+                    <div class="grid-2">
+                      <label class="field">
+                        <span>Занятость</span>
+                        <select id="employment">
+                          <option value="">Не указано</option>
+                          <option>Полная</option>
+                          <option>Частичная</option>
+                          <option>Проектная</option>
+                          <option>Стажировка</option>
+                        </select>
+                      </label>
+
+                      <label class="field">
+                        <span>График</span>
+                        <select id="schedule">
+                          <option value="">Не указано</option>
+                          <option>Полный день</option>
+                          <option>Гибкий</option>
+                          <option>Удаленная работа</option>
+                          <option>Сменный</option>
+                          <option>Вахта</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <div class="grid-2">
+                      <label class="field">
+                        <span>Готовность к командировкам</span>
+                        <select id="businessTrips">
+                          <option value="">Не указано</option>
+                          <option>Нет</option>
+                          <option>Иногда</option>
+                          <option>Да</option>
+                        </select>
+                      </label>
+
+                      <label class="field">
+                        <span>Желаемая зарплата</span>
+                        <input type="text" id="salary" placeholder="Например: 150 000 ₽">
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grid-2">
+                  <label class="field">
+                    <span>Телефон</span>
+                    <input type="tel" id="phone" placeholder="+7 999 123-45-67">
+                  </label>
+                  <label class="field">
+                    <span>Email</span>
+                    <input type="email" id="email" placeholder="example@gmail.com">
+                  </label>
+                </div>
               </div>
-            </div>
+            </details>
+
+
+            <details open class="acc">
+              <summary class="acc-head">
+                <span>Личная информация</span>
+                <span class="acc-hint">город, переезд, даты</span>
+              </summary>
+              <div class="acc-body">
+                <div class="grid-2">
+                  <label class="field">
+                    <span>Место жительства</span>
+                    <input type="text" id="city" placeholder="Например: Москва">
+                  </label>
+
+                  <label class="field">
+                    <span>Переезд</span>
+                    <select id="relocation">
+                      <option value="">Не указано</option>
+                      <option>Невозможен</option>
+                      <option>Возможен</option>
+                      <option>Нежелателен</option>
+                      <option>Желателен</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="grid-2">
+                  <label class="field">
+                    <span>Гражданство</span>
+                    <input type="text" id="citizenship" placeholder="Например: Россия">
+                  </label>
+
+                  <label class="field">
+                    <span>Дата рождения</span>
+                    <input type="date" id="dob">
+                  </label>
+                </div>
+
+                <div class="grid-2">
+                  <label class="field">
+                    <span>Пол</span>
+                    <select id="gender">
+                      <option value="">Не указано</option>
+                      <option>Мужской</option>
+                      <option>Женский</option>
+                    </select>
+                  </label>
+
+                  <label class="field">
+                    <span>Семейное положение</span>
+                    <select id="maritalStatus">
+                      <option value="">Не указано</option>
+                      <option>Холост/Не замужем</option>
+                      <option>Женат/Замужем</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="grid-2">
+                  <label class="field">
+                    <span>Есть дети</span>
+                    <select id="children">
+                      <option value="">Не указано</option>
+                      <option>Да</option>
+                      <option>Нет</option>
+                    </select>
+                  </label>
+
+                  <label class="field">
+                    <span>Образование (уровень)</span>
+                    <select id="educationLevel">
+                      <option value="">Не указано</option>
+                      <option>Среднее</option>
+                      <option>Среднее профессиональное</option>
+                      <option>Высшее</option>
+                      <option>Высшее неполное</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="subblock">
+                  <div class="subblock-head">
+                    <div class="subblock-title">Соцсети</div>
+                    <button class="btn btn-ghost btn-sm" id="addSocial" type="button">+ Добавить</button>
+                  </div>
+                  <div id="socials"></div>
+                </div>
+              </div>
+            </details>
+
+
+            <details class="acc">
+              <summary class="acc-head">
+                <span>Опыт работы</span>
+                <span class="acc-hint">компания и обязанности</span>
+              </summary>
+              <div class="acc-body">
+                <div class="subblock-head">
+                  <div class="subblock-title">Записи</div>
+                  <button class="btn btn-ghost btn-sm" id="addExperience" type="button">+ Добавить</button>
+                </div>
+                <div id="experienceList"></div>
+              </div>
+            </details>
+
+  
+            <details class="acc">
+              <summary class="acc-head">
+                <span>Профессиональные навыки</span>
+                <span class="acc-hint">список</span>
+              </summary>
+              <div class="acc-body">
+                <label class="field">
+                  <span>Навыки</span>
+                  <textarea id="skills" placeholder="Можно через запятую, ; или с новой строки"></textarea>
+                </label>
+              </div>
+            </details>
+
+            <details class="acc">
+              <summary class="acc-head">
+                <span>Образование</span>
+                <span class="acc-hint">учебное заведение и период</span>
+              </summary>
+              <div class="acc-body">
+                <div class="subblock-head">
+                  <div class="subblock-title">Записи</div>
+                  <button class="btn btn-ghost btn-sm" id="addEducation" type="button">+ Добавить</button>
+                </div>
+                <div id="educationList"></div>
+              </div>
+            </details>
+
+
+            <details class="acc">
+              <summary class="acc-head">
+                <span>Курсы и тренинги</span>
+                <span class="acc-hint">что изучали</span>
+              </summary>
+              <div class="acc-body">
+                <div class="subblock-head">
+                  <div class="subblock-title">Курсы</div>
+                  <button class="btn btn-ghost btn-sm" id="addCourse" type="button">+ Добавить</button>
+                </div>
+                <div id="coursesList"></div>
+              </div>
+            </details>
+
+      
+            <details class="acc">
+              <summary class="acc-head">
+                <span>Иностранные языки и компьютерные навыки</span>
+                <span class="acc-hint">отдельно</span>
+              </summary>
+              <div class="acc-body">
+                <label class="field">
+                  <span>Иностранные языки</span>
+                  <textarea id="languages" placeholder="Например: English — B2"></textarea>
+                </label>
+                <label class="field">
+                  <span>Владение компьютером</span>
+                  <textarea id="computerSkills" placeholder="Например: Excel, Word, Google Sheets, Jira"></textarea>
+                </label>
+              </div>
+            </details>
+
+  
+            <details class="acc">
+              <summary class="acc-head">
+                <span>Дополнительная информация</span>
+                <span class="acc-hint">права, рекомендации, хобби</span>
+              </summary>
+              <div class="acc-body">
+                <label class="field">
+                  <span>Водительские права (категории)</span>
+                  <input type="text" id="driverLicense" placeholder="Например: B">
+                </label>
+
+                <label class="field">
+                  <span>Рекомендации</span>
+                  <textarea id="recommendations" placeholder="Контакт или коротко о рекомендациях"></textarea>
+                </label>
+
+                <label class="field">
+                  <span>Занятия в свободное время</span>
+                  <textarea id="hobbies" placeholder="Хобби, спорт, проекты"></textarea>
+                </label>
+
+                <label class="field">
+                  <span>Личные качества</span>
+                  <textarea id="personalQualities" placeholder="Например: ответственность, инициативность"></textarea>
+                </label>
+              </div>
+            </details>
+
+          
+            <details class="acc">
+              <summary class="acc-head">
+                <span>О себе</span>
+                <span class="acc-hint">коротко</span>
+              </summary>
+              <div class="acc-body">
+                <label class="field">
+                  <span>О себе</span>
+                  <textarea id="about" placeholder="Короткое описание"></textarea>
+                </label>
+              </div>
+            </details>
+
+          </div>
+
+          <div class="bottom-actions">
+            <button type="button" id="clearForm" class="btn btn-danger">Очистить</button>
+            <button type="button" id="toPreview" class="btn btn-primary" disabled>Перейти к просмотру</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </main>
+
+
+  <main class="page step step-2 hidden" id="step2">
+    <div class="layout">
+      <aside class="side">
+        <div class="side-card">
+          <div class="side-title">Шаблон</div>
+          <div class="template-icons">
+            <button class="btn btn-ghost tmpl-btn active" data-tmpl="template-1" type="button">Шаблон A</button>
+            <button class="btn btn-ghost tmpl-btn" data-tmpl="template-2" type="button">Шаблон B</button>
+          </div>
+
+          <div class="side-title mt">Экспорт</div>
+          <div class="stack">
+            <button type="button" id="exportPdf" class="btn btn-primary">Скачать PDF</button>
+            <button type="button" id="exportDocx" class="btn btn-primary">Скачать DOCX</button>
+            <button type="button" id="printBtn" class="btn btn-ghost">Печать</button>
+            <button type="button" id="backToEdit" class="btn btn-ghost">← Назад к заполнению</button>
+          </div>
+
+          <div class="side-note">
+            Примечание: пустые поля не попадут в итоговый документ.
+          </div>
+        </div>
+      </aside>
+
+      <section class="preview-area">
+        <div class="preview-top">
+          <div class="preview-title">Превью резюме</div>
+          <div class="scroll-controls">
+            <button class="btn btn-ghost btn-sm" id="scrollUp" type="button">Вверх</button>
+            <button class="btn btn-ghost btn-sm" id="scrollDown" type="button">Вниз</button>
           </div>
         </div>
 
-        <div class="block education">
-          <h3>Образование <button class="small" id="addEducation">+ добавить</button></h3>
-          <div id="educationList"></div>
-        </div>
-
-        <div class="block experience">
-          <h3>Опыт работы <button class="small" id="addExperience">+ добавить</button></h3>
-          <div id="experienceList"></div>
-        </div>
-
-        <div class="block skills">
-          <h3>Навыки</h3>
-          <textarea id="skills" placeholder="Например: языки, программирование, личные качества"></textarea>
-        </div>
-
-        <div class="block about">
-          <h3>О себе</h3>
-          <textarea id="about" placeholder="Коротко о себе"></textarea>
-        </div>
-
-        <div class="actions">
-          <button type="button" id="exportPdf" class="primary">Скачать PDF</button>
-          <button type="button" id="exportDoc">Скачать .doc</button>
-        </div>
-      </form>
-    </section>
-
-    <aside class="preview-wrap">
-      <div class="preview-top">
-        <h2>Превью</h2>
-        <div class="scroll-controls">
-          <button id="scrollUp">▲</button>
-          <button id="scrollDown">▼</button>
-        </div>
-      </div>
-      <div id="resumePreview" class="resume-preview template-1" contenteditable="false"></div>
-    </aside>
+        <div id="resumePreview" class="resume-preview template-1" contenteditable="false"></div>
+      </section>
+    </div>
   </main>
 
-  <footer class="footer">Одностраничный генератор резюме — простая версия</footer>
+  <footer class="footer"></footer>
 
   <script src="app.js"></script>
 </body>
