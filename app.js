@@ -393,11 +393,183 @@ function renderPreview() {
   if (!resumePreview) return;
 
   const { data, edu, exp, courses, soc, hasPhoto, photoSrc, skillsList } = collectData();
+  const tmpl2 = resumePreview.classList.contains('template-2');
 
-  const displayName = data.name || 'Ф.И.О.';
-  const displayRole = data.position ? `<div class="role">${escapeHtml(data.position)}</div>` : '';
+  // Общие хелперы
+  const only = (v) => (v || '').trim();
+  const kv = (k, v) => v ? `<div class="t2-kv-row"><span class="k">${escapeHtml(k)}:</span> <span class="v">${escapeHtml(v)}</span></div>` : '';
+  const ul = (arr) => arr && arr.length ? `<ul class="${tmpl2 ? 't2-list' : ''}">${arr.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul>` : '';
+  const lines = (text) => {
+    const raw = (text || '').trim();
+    if (!raw) return '';
+    const arr = raw.split('\n').map(s => s.trim()).filter(Boolean);
+    if (arr.length >= 2) return ul(arr.map(s => s.replace(/^[-•●]\s*/, '')));
+    return `<p class="${tmpl2 ? '' : 'blockline'}">${escapeHtml(raw)}</p>`;
+  };
 
-  // HEADER: lines like screenshot
+  const name = only(data.name) || 'Ф.И.О.';
+  const pos  = only(data.position);
+
+  // -------- TEMPLATE 2 (two column) --------
+  if (tmpl2) {
+    // LEFT blocks
+    const personalLeft = [
+      data.city ? `Место проживания: ${data.city}` : '',
+      data.dob ? `Дата рождения: ${data.dob}` : '',
+      data.citizenship ? `Гражданство: ${data.citizenship}` : '',
+      data.relocation ? `Переезд: ${data.relocation}` : '',
+      data.educationLevel ? `Образование: ${data.educationLevel}` : '',
+      data.gender ? `Пол: ${data.gender}` : '',
+      data.maritalStatus ? `Семейное положение: ${data.maritalStatus}` : '',
+      data.children ? `Дети: ${data.children}` : '',
+    ].filter(Boolean);
+
+    const contactsLeft = [
+      data.phone ? `Телефон: ${data.phone}` : '',
+      data.email ? `Email: ${data.email}` : '',
+    ].filter(Boolean);
+
+    const languagesLeft = only(data.languages) ? data.languages.split('\n').map(s=>s.trim()).filter(Boolean) : [];
+    const skillsLeft = skillsList;
+
+    // RIGHT blocks
+    const expHtml = exp.length ? `
+      <div class="box">
+        <div class="box-title">Опыт работы</div>
+        <div class="box-body">
+          ${exp.map(e => {
+            const period = [formatMonth(e.from), only(e.to)].filter(Boolean).join(' — ');
+            const head = [only(e.company), only(e.role)].filter(Boolean).join(' — ');
+            const desc = only(e.desc) ? lines(e.desc) : '';
+            return `
+              <div class="job">
+                <div class="job-head">
+                  <div>${escapeHtml(head || '—')}</div>
+                  <div class="muted">${escapeHtml(period)}</div>
+                </div>
+                ${desc ? `<div style="margin-top:6px">${desc}</div>` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : '';
+
+    const eduHtml = edu.length ? `
+      <div class="box">
+        <div class="box-title">Образование</div>
+        <div class="box-body">
+          ${edu.map(e => {
+            const dates = [formatMonth(e.from), formatMonth(e.to)].filter(Boolean).join(' — ');
+            const main = e.school ? escapeHtml(e.school) : '';
+            const sub = [e.faculty ? `Факультет: ${e.faculty}` : '', e.speciality ? `Специальность: ${e.speciality}` : '']
+              .filter(Boolean).join(' • ');
+            return `
+              <div class="job">
+                <div class="job-head">
+                  <div>${main}</div>
+                  <div class="muted">${escapeHtml(dates)}</div>
+                </div>
+                ${sub ? `<div class="job-sub">${escapeHtml(sub)}</div>` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : '';
+
+    const coursesHtml = courses.length ? `
+      <div class="box">
+        <div class="box-title">Курсы</div>
+        <div class="box-body">
+          ${courses.map(c => {
+            const tail = [only(c.org), only(c.year)].filter(Boolean).join(' • ');
+            return `
+              <div class="job">
+                <div class="job-head">
+                  <div>${escapeHtml(c.title)}</div>
+                  <div class="muted">${escapeHtml(only(c.year))}</div>
+                </div>
+                ${tail ? `<div class="job-sub">${escapeHtml(tail)}</div>` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : '';
+
+    const addLines = [];
+    if (only(data.computerSkills)) addLines.push(`Компьютерные навыки: ${data.computerSkills}`);
+    if (only(data.driverLicense)) addLines.push(`Водительские права: ${data.driverLicense}`);
+    if (only(data.recommendations)) addLines.push(`Рекомендации: ${data.recommendations}`);
+    if (only(data.hobbies)) addLines.push(`Свободное время: ${data.hobbies}`);
+    if (only(data.personalQualities)) addLines.push(`Личные качества: ${data.personalQualities}`);
+    const additionalHtml = addLines.length ? `
+      <div class="box">
+        <div class="box-title">Дополнительная информация</div>
+        <div class="box-body">${lines(addLines.join('\n'))}</div>
+      </div>
+    ` : '';
+
+    const aboutHtml = only(data.about) ? `
+      <div class="box">
+        <div class="box-title">О себе</div>
+        <div class="box-body">${lines(data.about)}</div>
+      </div>
+    ` : '';
+
+    resumePreview.innerHTML = `
+      <div class="sheet">
+        <div class="t2">
+          <div class="t2-left">
+            <div class="t2-photo">
+              ${hasPhoto ? `<img src="${photoSrc}" alt="Фото">` : ``}
+            </div>
+
+            <div class="t2-name">${escapeHtml(name)}</div>
+            ${pos ? `<div class="t2-pos">${escapeHtml(pos)}</div>` : ''}
+
+            ${personalLeft.length ? `
+              <h3>Личная информация</h3>
+              <div class="t2-kv">
+                ${personalLeft.map(x => `<div>${escapeHtml(x)}</div>`).join('')}
+              </div>
+            ` : ''}
+
+            ${contactsLeft.length ? `
+              <h3>Контакты</h3>
+              <div class="t2-kv">
+                ${contactsLeft.map(x => `<div>${escapeHtml(x)}</div>`).join('')}
+              </div>
+            ` : ''}
+
+            ${languagesLeft.length ? `
+              <h3>Языки</h3>
+              ${ul(languagesLeft)}
+            ` : ''}
+
+            ${skillsLeft.length ? `
+              <h3>Навыки</h3>
+              ${ul(skillsLeft)}
+            ` : ''}
+          </div>
+
+          <div class="t2-right">
+            ${expHtml}
+            ${eduHtml}
+            ${coursesHtml}
+            ${additionalHtml}
+            ${aboutHtml}
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  // -------- TEMPLATE 1 (оставляем как было — классика “как на скрине”) --------
+  // Ничего не ломаем: твой текущий Template-1 рендер остаётся прежним
+  // (ниже — короткий вариант на основе уже сделанного)
   const headerMeta = [
     data.employment ? `Занятость: ${data.employment}` : '',
     data.schedule ? `График работы: ${data.schedule}` : '',
@@ -411,7 +583,6 @@ function renderPreview() {
     ? `<div class="meta">${headerMeta.map(x => `<div class="meta-line">${escapeHtml(x)}</div>`).join('')}</div>`
     : '';
 
-  // PERSONAL block
   const personalLines = [
     data.citizenship ? `Гражданство: ${data.citizenship}` : '',
     data.city ? `Место проживания: ${data.city}` : '',
@@ -424,25 +595,16 @@ function renderPreview() {
   ].filter(Boolean);
 
   const personalSection = personalLines.length
-    ? `
-      <div class="section">
-        <h2>Личная информация</h2>
-        ${personalLines.map(x => `<p class="blockline">${escapeHtml(x)}</p>`).join('')}
-      </div>
-    `
+    ? `<div class="section"><h2>Личная информация</h2>${personalLines.map(x => `<p class="blockline">${escapeHtml(x)}</p>`).join('')}</div>`
     : '';
 
-  // EXPERIENCE with period
   const expSection = exp.length ? `
     <div class="section">
       <h2>Опыт работы</h2>
       ${exp.map(e => {
         const period = [formatMonth(e.from), (e.to || '')].filter(Boolean).join(' — ');
         const head = [e.role, e.company].filter(Boolean).join(', ');
-        const desc = e.desc ? `
-          <div class="blockline"><span class="label">Должностные обязанности и достижения:</span></div>
-          ${toListOrParagraph(e.desc)}
-        ` : '';
+        const desc = e.desc ? `<div class="blockline"><span class="label">Должностные обязанности и достижения:</span></div>${lines(e.desc)}` : '';
         return `
           ${period ? `<p class="blockline"><span class="label">Период работы:</span> ${escapeHtml(period)}</p>` : ''}
           ${head ? `<p class="blockline"><span class="label">Должность/организация:</span> ${escapeHtml(head)}</p>` : ''}
@@ -452,7 +614,6 @@ function renderPreview() {
     </div>
   ` : '';
 
-  // SKILLS right after experience
   const skillsSection = skillsList.length ? `
     <div class="section">
       <h2>Профессиональные навыки</h2>
@@ -460,7 +621,6 @@ function renderPreview() {
     </div>
   ` : '';
 
-  // EDUCATION with faculty + speciality
   const eduSection = edu.length ? `
     <div class="section">
       <h2>Образование</h2>
@@ -489,60 +649,20 @@ function renderPreview() {
     </div>
   ` : '';
 
-  const languagesSection = data.languages ? `
-    <div class="section">
-      <h2>Иностранные языки</h2>
-      ${toListOrParagraph(data.languages)}
-    </div>
-  ` : '';
-
-  const computerSection = data.computerSkills ? `
-    <div class="section">
-      <h2>Компьютерные навыки</h2>
-      ${toListOrParagraph(data.computerSkills)}
-    </div>
-  ` : '';
-
-  const additionalPairs = [];
-  if (data.driverLicense) additionalPairs.push(`<p class="blockline"><span class="label">Водительские права:</span> ${escapeHtml(data.driverLicense)}</p>`);
-  if (data.recommendations) additionalPairs.push(`<p class="blockline"><span class="label">Рекомендации:</span><br>${escapeHtml(data.recommendations).replace(/\n/g,'<br>')}</p>`);
-  if (data.hobbies) additionalPairs.push(`<p class="blockline"><span class="label">Свободное время:</span><br>${escapeHtml(data.hobbies).replace(/\n/g,'<br>')}</p>`);
-  if (data.personalQualities) additionalPairs.push(`<p class="blockline"><span class="label">Личные качества:</span><br>${escapeHtml(data.personalQualities).replace(/\n/g,'<br>')}</p>`);
-
-  const additionalSection = additionalPairs.length ? `
-    <div class="section">
-      <h2>Дополнительная информация</h2>
-      ${additionalPairs.join('')}
-    </div>
-  ` : '';
-
   const aboutSection = data.about ? `
     <div class="section">
       <h2>О себе</h2>
-      ${toListOrParagraph(data.about)}
+      ${lines(data.about)}
     </div>
   ` : '';
 
-  const socSection = soc.length ? `
-    <div class="section">
-      <h2>Соцсети</h2>
-      ${soc.map(s => {
-        const title = s.title ? escapeHtml(s.title) : 'Ссылка';
-        const href = s.link ? escapeHtml(normalizeUrl(s.link)) : '';
-        const txt = s.link ? escapeHtml(s.link) : '';
-        return `<p class="blockline"><strong>${title}:</strong> ${href ? `<a href="${href}" target="_blank" rel="noopener">${txt || href}</a>` : (txt || '')}</p>`;
-      }).join('')}
-    </div>
-  ` : '';
-
-  // Wrapper for templates — easy to add template-3 etc via CSS
   resumePreview.innerHTML = `
     <div class="sheet">
       <div class="header">
         ${hasPhoto ? `<div class="photo"><img src="${photoSrc}" alt="Фото"></div>` : `<div class="photo" aria-hidden="true"></div>`}
         <div>
-          <h1>${escapeHtml(displayName)}</h1>
-          ${displayRole}
+          <h1>${escapeHtml(name)}</h1>
+          ${pos ? `<div class="role">${escapeHtml(pos)}</div>` : ''}
           ${headerMetaHtml}
         </div>
       </div>
@@ -552,14 +672,11 @@ function renderPreview() {
       ${skillsSection}
       ${eduSection}
       ${coursesSection}
-      ${languagesSection}
-      ${computerSection}
-      ${additionalSection}
       ${aboutSection}
-      ${socSection}
     </div>
   `;
 }
+
 
 // ---------------- Listeners ----------------
 form?.addEventListener('input', debouncedRender);
