@@ -15,14 +15,17 @@ function normalizeUrl(url){
   return v;
 }
 
+// Expecting "m.Y" from flatpickr monthSelect
 function formatMonth(v){
-  if(!v) return '';
-  const s = String(v).trim();
+  const s = (v || '').trim();
+  if (!s) return '';
+  // already m.Y
+  if (/^\d{1,2}\.\d{4}$/.test(s)) return s;
+  // fallback YYYY-MM
   if (/^\d{4}-\d{2}$/.test(s)) {
     const [y,m] = s.split('-');
     return `${m}.${y}`;
   }
-  if (/^\d{2}\.\d{4}$/.test(s)) return s;
   return s;
 }
 
@@ -50,6 +53,17 @@ function dataUrlToUint8Array(dataUrl){
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
+}
+
+// Convert multiline to UL if many lines
+function toListOrParagraph(text) {
+  const raw = (text || '').trim();
+  if (!raw) return '';
+  const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
+  if (lines.length >= 2) {
+    return `<ul>${lines.map(l => `<li>${escapeHtml(l.replace(/^[-•●]\s*/, ''))}</li>`).join('')}</ul>`;
+  }
+  return `<p class="blockline">${escapeHtml(raw)}</p>`;
 }
 
 // ---------------- Steps ----------------
@@ -130,6 +144,7 @@ function debouncedRender() {
   clearTimeout(_t);
   _t = setTimeout(() => {
     syncPreviewButton();
+    // превью реально видно только на шаге 2, но рендерим всегда — безопасно
     renderPreview();
   }, 120);
 }
@@ -156,9 +171,7 @@ function initMonthPicker(input){
     const pluginFactory = getMonthSelectPlugin();
     if (pluginFactory) {
       window.flatpickr(input, {
-        plugins: [
-          pluginFactory({ shorthand: true, dateFormat: "m.Y", altFormat: "m.Y" })
-        ],
+        plugins: [ pluginFactory({ shorthand: true, dateFormat: "m.Y", altFormat: "m.Y" }) ],
         allowInput: true,
       });
     }
@@ -173,6 +186,10 @@ function makeEducationEntry() {
   row.className = 'edu-row';
   row.innerHTML = `
     <input class="edu-school" placeholder="Учебное заведение">
+    <div class="two-cols">
+      <input type="text" class="edu-faculty" placeholder="Факультет (необязательно)">
+      <input type="text" class="edu-speciality" placeholder="Специальность (необязательно)">
+    </div>
     <div class="two-cols">
       <input type="text" class="edu-from" placeholder="Начало (ММ.ГГГГ)" inputmode="numeric">
       <input type="text" class="edu-to" placeholder="Окончание (ММ.ГГГГ)" inputmode="numeric">
@@ -196,15 +213,26 @@ function makeExperienceEntry() {
   const row = document.createElement('div');
   row.className = 'exp-row';
   row.innerHTML = `
-    <input class="exp-company" placeholder="Место работы">
+    <div class="two-cols">
+      <input type="text" class="exp-from" placeholder="С (ММ.ГГГГ)" inputmode="numeric">
+      <input type="text" class="exp-to" placeholder="По (ММ.ГГГГ или 'настоящее')" inputmode="numeric">
+    </div>
+    <input class="exp-company" placeholder="Организация / место работы">
     <input class="exp-role" placeholder="Должность">
-    <textarea class="exp-desc" placeholder="Обязанности (по желанию)"></textarea>
+    <textarea class="exp-desc" placeholder="Обязанности и достижения (каждый пункт с новой строки)"></textarea>
     <button class="btn btn-ghost btn-sm remove" type="button">Удалить</button>
   `;
+
+  initMonthPicker(row.querySelector('.exp-from'));
+  // для exp-to оставляем ввод свободным (можно "настоящее время")
+  // но если хочешь тоже picker — раскомментируй:
+  // initMonthPicker(row.querySelector('.exp-to'));
+
   row.querySelector('.remove').addEventListener('click', () => {
     row.remove();
     debouncedRender();
   });
+
   row.addEventListener('input', debouncedRender);
   return row;
 }
@@ -295,7 +323,6 @@ photoInput?.addEventListener('change', () => {
 // ---------------- Data collection ----------------
 function collectData() {
   const data = {
-    // Basic
     name: ($('fullName')?.value || '').trim(),
     position: ($('position')?.value || '').trim(),
     employment: ($('employment')?.value || '').trim(),
@@ -306,7 +333,6 @@ function collectData() {
     phone: ($('phone')?.value || '').trim(),
     email: ($('email')?.value || '').trim(),
 
-    // Personal
     city: ($('city')?.value || '').trim(),
     relocation: ($('relocation')?.value || '').trim(),
     citizenship: ($('citizenship')?.value || '').trim(),
@@ -316,31 +342,32 @@ function collectData() {
     children: ($('children')?.value || '').trim(),
     educationLevel: ($('educationLevel')?.value || '').trim(),
 
-    // Skills blocks
     skills: ($('skills')?.value || ''),
     languages: ($('languages')?.value || '').trim(),
     computerSkills: ($('computerSkills')?.value || '').trim(),
 
-    // Additional
     driverLicense: ($('driverLicense')?.value || '').trim(),
     recommendations: ($('recommendations')?.value || '').trim(),
     hobbies: ($('hobbies')?.value || '').trim(),
     personalQualities: ($('personalQualities')?.value || '').trim(),
-
     about: ($('about')?.value || '').trim(),
   };
 
   const edu = [...document.querySelectorAll('.edu-row')].map(row => ({
     school: (row.querySelector('.edu-school')?.value || '').trim(),
+    faculty: (row.querySelector('.edu-faculty')?.value || '').trim(),
+    speciality: (row.querySelector('.edu-speciality')?.value || '').trim(),
     from: (row.querySelector('.edu-from')?.value || '').trim(),
     to: (row.querySelector('.edu-to')?.value || '').trim(),
   })).filter(e => e.school);
 
   const exp = [...document.querySelectorAll('.exp-row')].map(row => ({
+    from: (row.querySelector('.exp-from')?.value || '').trim(),
+    to: (row.querySelector('.exp-to')?.value || '').trim(),
     company: (row.querySelector('.exp-company')?.value || '').trim(),
     role: (row.querySelector('.exp-role')?.value || '').trim(),
     desc: (row.querySelector('.exp-desc')?.value || '').trim(),
-  })).filter(e => e.company || e.role);
+  })).filter(e => e.company || e.role || e.desc || e.from || e.to);
 
   const courses = [...document.querySelectorAll('.course-row')].map(row => ({
     title: (row.querySelector('.course-title')?.value || '').trim(),
@@ -370,128 +397,166 @@ function renderPreview() {
   const displayName = data.name || 'Ф.И.О.';
   const displayRole = data.position ? `<div class="role">${escapeHtml(data.position)}</div>` : '';
 
-  const metaLines = [];
+  // HEADER: lines like screenshot
+  const headerMeta = [
+    data.employment ? `Занятость: ${data.employment}` : '',
+    data.schedule ? `График работы: ${data.schedule}` : '',
+    data.businessTrips ? `Готовность к командировкам: ${data.businessTrips}` : '',
+    data.salary ? `Желаемая зарплата: ${data.salary}` : '',
+    data.phone ? `Телефон: ${data.phone}` : '',
+    data.email ? `Электронная почта: ${data.email}` : '',
+  ].filter(Boolean);
 
-  // Like SimpleDoc header conditions, but minimal
-  if (data.employment) metaLines.push(`<div class="meta-line"><strong>Занятость:</strong> ${escapeHtml(data.employment)}</div>`);
-  if (data.schedule) metaLines.push(`<div class="meta-line"><strong>График:</strong> ${escapeHtml(data.schedule)}</div>`);
-  if (data.businessTrips) metaLines.push(`<div class="meta-line"><strong>Командировки:</strong> ${escapeHtml(data.businessTrips)}</div>`);
-  if (data.salary) metaLines.push(`<div class="meta-line"><strong>Зарплата:</strong> ${escapeHtml(data.salary)}</div>`);
-
-  if (data.phone || data.email) {
-    metaLines.push(`
-      <div class="meta-line">
-        <strong>Контакты:</strong>
-        <div class="meta-sub">
-          ${data.phone ? `<div>Телефон: ${escapeHtml(data.phone)}</div>` : ''}
-          ${data.email ? `<div>Email: ${escapeHtml(data.email)}</div>` : ''}
-        </div>
-      </div>
-    `);
-  }
-
-  // Personal info block (only if any present)
-  const personalPairs = [];
-  if (data.citizenship) personalPairs.push(`<div class="meta-line"><strong>Гражданство:</strong> ${escapeHtml(data.citizenship)}</div>`);
-  if (data.city) personalPairs.push(`<div class="meta-line"><strong>Место жительства:</strong> ${escapeHtml(data.city)}</div>`);
-  if (data.relocation) personalPairs.push(`<div class="meta-line"><strong>Переезд:</strong> ${escapeHtml(data.relocation)}</div>`);
-  if (data.educationLevel) personalPairs.push(`<div class="meta-line"><strong>Образование:</strong> ${escapeHtml(data.educationLevel)}</div>`);
-  if (data.dob) personalPairs.push(`<div class="meta-line"><strong>Дата рождения:</strong> ${escapeHtml(data.dob)}</div>`);
-  if (data.gender) personalPairs.push(`<div class="meta-line"><strong>Пол:</strong> ${escapeHtml(data.gender)}</div>`);
-  if (data.maritalStatus) personalPairs.push(`<div class="meta-line"><strong>Семейное положение:</strong> ${escapeHtml(data.maritalStatus)}</div>`);
-  if (data.children) personalPairs.push(`<div class="meta-line"><strong>Дети:</strong> ${escapeHtml(data.children)}</div>`);
-
-  const personalSection = personalPairs.length
-    ? `<h2>Личная информация</h2><div class="meta">${personalPairs.join('')}</div>`
+  const headerMetaHtml = headerMeta.length
+    ? `<div class="meta">${headerMeta.map(x => `<div class="meta-line">${escapeHtml(x)}</div>`).join('')}</div>`
     : '';
 
-  const eduSection = edu.length ? `
-    <h2>Образование</h2>
-    ${edu.map(e => {
-      const dates = [formatMonth(e.from), formatMonth(e.to)].filter(Boolean).join(' — ');
-      return `<p><strong>${escapeHtml(e.school)}</strong>${dates ? `<br><span class="meta-line">${escapeHtml(dates)}</span>` : ''}</p>`;
-    }).join('')}
+  // PERSONAL block
+  const personalLines = [
+    data.citizenship ? `Гражданство: ${data.citizenship}` : '',
+    data.city ? `Место проживания: ${data.city}` : '',
+    data.relocation ? `Переезд: ${data.relocation}` : '',
+    data.educationLevel ? `Образование: ${data.educationLevel}` : '',
+    data.dob ? `Дата рождения: ${data.dob}` : '',
+    data.gender ? `Пол: ${data.gender}` : '',
+    data.maritalStatus ? `Семейное положение: ${data.maritalStatus}` : '',
+    data.children ? `Дети: ${data.children}` : '',
+  ].filter(Boolean);
+
+  const personalSection = personalLines.length
+    ? `
+      <div class="section">
+        <h2>Личная информация</h2>
+        ${personalLines.map(x => `<p class="blockline">${escapeHtml(x)}</p>`).join('')}
+      </div>
+    `
+    : '';
+
+  // EXPERIENCE with period
+  const expSection = exp.length ? `
+    <div class="section">
+      <h2>Опыт работы</h2>
+      ${exp.map(e => {
+        const period = [formatMonth(e.from), (e.to || '')].filter(Boolean).join(' — ');
+        const head = [e.role, e.company].filter(Boolean).join(', ');
+        const desc = e.desc ? `
+          <div class="blockline"><span class="label">Должностные обязанности и достижения:</span></div>
+          ${toListOrParagraph(e.desc)}
+        ` : '';
+        return `
+          ${period ? `<p class="blockline"><span class="label">Период работы:</span> ${escapeHtml(period)}</p>` : ''}
+          ${head ? `<p class="blockline"><span class="label">Должность/организация:</span> ${escapeHtml(head)}</p>` : ''}
+          ${desc}
+        `;
+      }).join('')}
+    </div>
   ` : '';
 
-  const expSection = exp.length ? `
-    <h2>Опыт работы</h2>
-    ${exp.map(e => {
-      const title = [e.company, e.role].filter(Boolean).join(' — ');
-      const desc = e.desc ? `<p>${escapeHtml(e.desc).replace(/\n/g,'<br>')}</p>` : '';
-      return `<p><strong>${escapeHtml(title)}</strong></p>${desc}`;
-    }).join('')}
+  // SKILLS right after experience
+  const skillsSection = skillsList.length ? `
+    <div class="section">
+      <h2>Профессиональные навыки</h2>
+      <ul>${skillsList.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul>
+    </div>
+  ` : '';
+
+  // EDUCATION with faculty + speciality
+  const eduSection = edu.length ? `
+    <div class="section">
+      <h2>Образование</h2>
+      ${edu.map(e => {
+        const dates = [formatMonth(e.from), formatMonth(e.to)].filter(Boolean).join(' — ');
+        return `
+          <p class="blockline"><span class="label">Учебное заведение:</span> ${escapeHtml(e.school)}</p>
+          ${e.faculty ? `<p class="blockline"><span class="label">Факультет:</span> ${escapeHtml(e.faculty)}</p>` : ''}
+          ${e.speciality ? `<p class="blockline"><span class="label">Специальность:</span> ${escapeHtml(e.speciality)}</p>` : ''}
+          ${dates ? `<p class="blockline"><span class="label">Период:</span> ${escapeHtml(dates)}</p>` : ''}
+        `;
+      }).join('')}
+    </div>
   ` : '';
 
   const coursesSection = courses.length ? `
-    <h2>Курсы и тренинги</h2>
-    ${courses.map(c => {
-      const tail = [c.org, c.year].filter(Boolean).join(' · ');
-      return `<p><strong>${escapeHtml(c.title)}</strong>${tail ? `<br><span class="meta-line">${escapeHtml(tail)}</span>` : ''}</p>`;
-    }).join('')}
+    <div class="section">
+      <h2>Курсы и тренинги</h2>
+      ${courses.map(c => {
+        const tail = [c.org, c.year].filter(Boolean).join(' · ');
+        return `
+          <p class="blockline"><span class="label">Название курса:</span> ${escapeHtml(c.title)}</p>
+          ${tail ? `<p class="blockline"><span class="label">Детали:</span> ${escapeHtml(tail)}</p>` : ''}
+        `;
+      }).join('')}
+    </div>
   ` : '';
 
   const languagesSection = data.languages ? `
-    <h2>Иностранные языки</h2>
-    <p>${escapeHtml(data.languages).replace(/\n/g,'<br>')}</p>
+    <div class="section">
+      <h2>Иностранные языки</h2>
+      ${toListOrParagraph(data.languages)}
+    </div>
   ` : '';
 
   const computerSection = data.computerSkills ? `
-    <h2>Компьютерные навыки</h2>
-    <p>${escapeHtml(data.computerSkills).replace(/\n/g,'<br>')}</p>
-  ` : '';
-
-  const skillsSection = skillsList.length ? `
-    <h2>Профессиональные навыки</h2>
-    <ul>${skillsList.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul>
-  ` : '';
-
-  const aboutSection = data.about ? `
-    <h2>О себе</h2>
-    <p>${escapeHtml(data.about).replace(/\n/g,'<br>')}</p>
+    <div class="section">
+      <h2>Компьютерные навыки</h2>
+      ${toListOrParagraph(data.computerSkills)}
+    </div>
   ` : '';
 
   const additionalPairs = [];
-  if (data.driverLicense) additionalPairs.push(`<p><strong>Права:</strong> ${escapeHtml(data.driverLicense)}</p>`);
-  if (data.recommendations) additionalPairs.push(`<p><strong>Рекомендации:</strong><br>${escapeHtml(data.recommendations).replace(/\n/g,'<br>')}</p>`);
-  if (data.hobbies) additionalPairs.push(`<p><strong>Свободное время:</strong><br>${escapeHtml(data.hobbies).replace(/\n/g,'<br>')}</p>`);
-  if (data.personalQualities) additionalPairs.push(`<p><strong>Личные качества:</strong><br>${escapeHtml(data.personalQualities).replace(/\n/g,'<br>')}</p>`);
+  if (data.driverLicense) additionalPairs.push(`<p class="blockline"><span class="label">Водительские права:</span> ${escapeHtml(data.driverLicense)}</p>`);
+  if (data.recommendations) additionalPairs.push(`<p class="blockline"><span class="label">Рекомендации:</span><br>${escapeHtml(data.recommendations).replace(/\n/g,'<br>')}</p>`);
+  if (data.hobbies) additionalPairs.push(`<p class="blockline"><span class="label">Свободное время:</span><br>${escapeHtml(data.hobbies).replace(/\n/g,'<br>')}</p>`);
+  if (data.personalQualities) additionalPairs.push(`<p class="blockline"><span class="label">Личные качества:</span><br>${escapeHtml(data.personalQualities).replace(/\n/g,'<br>')}</p>`);
 
   const additionalSection = additionalPairs.length ? `
-    <h2>Дополнительная информация</h2>
-    ${additionalPairs.join('')}
+    <div class="section">
+      <h2>Дополнительная информация</h2>
+      ${additionalPairs.join('')}
+    </div>
+  ` : '';
+
+  const aboutSection = data.about ? `
+    <div class="section">
+      <h2>О себе</h2>
+      ${toListOrParagraph(data.about)}
+    </div>
   ` : '';
 
   const socSection = soc.length ? `
-    <h2>Соцсети</h2>
-    ${soc.map(s => {
-      const title = s.title ? escapeHtml(s.title) : 'Ссылка';
-      const href = s.link ? escapeHtml(normalizeUrl(s.link)) : '';
-      const txt = s.link ? escapeHtml(s.link) : '';
-      return `<p><strong>${title}:</strong> ${href ? `<a href="${href}" target="_blank" rel="noopener">${txt || href}</a>` : (txt || '')}</p>`;
-    }).join('')}
+    <div class="section">
+      <h2>Соцсети</h2>
+      ${soc.map(s => {
+        const title = s.title ? escapeHtml(s.title) : 'Ссылка';
+        const href = s.link ? escapeHtml(normalizeUrl(s.link)) : '';
+        const txt = s.link ? escapeHtml(s.link) : '';
+        return `<p class="blockline"><strong>${title}:</strong> ${href ? `<a href="${href}" target="_blank" rel="noopener">${txt || href}</a>` : (txt || '')}</p>`;
+      }).join('')}
+    </div>
   ` : '';
 
+  // Wrapper for templates — easy to add template-3 etc via CSS
   resumePreview.innerHTML = `
     <div class="sheet">
       <div class="header">
-        ${hasPhoto ? `<div class="photo"><img src="${photoSrc}" alt="Фото"></div>` : ''}
+        ${hasPhoto ? `<div class="photo"><img src="${photoSrc}" alt="Фото"></div>` : `<div class="photo" aria-hidden="true"></div>`}
         <div>
           <h1>${escapeHtml(displayName)}</h1>
           ${displayRole}
-          ${metaLines.length ? `<div class="meta">${metaLines.join('')}</div>` : ''}
+          ${headerMetaHtml}
         </div>
       </div>
 
-    ${personalSection}
-    ${expSection}
-    ${skillsSection}
-    ${eduSection}
-    ${coursesSection}
-    ${languagesSection}
-    ${computerSection}
-    ${aboutSection}
-    ${additionalSection}
-    ${socSection}
+      ${personalSection}
+      ${expSection}
+      ${skillsSection}
+      ${eduSection}
+      ${coursesSection}
+      ${languagesSection}
+      ${computerSection}
+      ${additionalSection}
+      ${aboutSection}
+      ${socSection}
     </div>
   `;
 }
@@ -499,11 +564,9 @@ function renderPreview() {
 // ---------------- Listeners ----------------
 form?.addEventListener('input', debouncedRender);
 
-// Scroll
 scrollUp?.addEventListener('click', () => resumePreview.scrollBy({ top: -220, behavior: 'smooth' }));
 scrollDown?.addEventListener('click', () => resumePreview.scrollBy({ top: 220, behavior: 'smooth' }));
 
-// Print
 printBtn?.addEventListener('click', () => {
   renderPreview();
   window.print();
@@ -583,7 +646,6 @@ exportDocx?.addEventListener('click', async (e) => {
     } catch (_) {}
   }
 
-  // Title
   children.push(new Paragraph({
     heading: HeadingLevel.TITLE,
     alignment: AlignmentType.LEFT,
@@ -595,27 +657,21 @@ exportDocx?.addEventListener('click', async (e) => {
     children.push(new Paragraph({ children: [new TextRun({ text: data.position })], spacing: { after: 120 } }));
   }
 
-  // Top meta (only filled)
   const topLines = [];
   if (data.employment) topLines.push(`Занятость: ${data.employment}`);
-  if (data.schedule) topLines.push(`График: ${data.schedule}`);
+  if (data.schedule) topLines.push(`График работы: ${data.schedule}`);
   if (data.businessTrips) topLines.push(`Командировки: ${data.businessTrips}`);
-  if (data.salary) topLines.push(`Зарплата: ${data.salary}`);
+  if (data.salary) topLines.push(`Желаемая зарплата: ${data.salary}`);
+  if (data.phone) topLines.push(`Телефон: ${data.phone}`);
+  if (data.email) topLines.push(`Электронная почта: ${data.email}`);
 
   for (const line of topLines) {
     children.push(new Paragraph({ children: [new TextRun({ text: line })], spacing: { after: 60 } }));
   }
 
-  if (data.phone || data.email) {
-    children.push(new Paragraph({ children: [new TextRun({ text: `Контакты:`, bold: true })], spacing: { after: 60 } }));
-    if (data.phone) children.push(new Paragraph({ children: [new TextRun({ text: `Телефон: ${data.phone}` })], spacing: { after: 60 } }));
-    if (data.email) children.push(new Paragraph({ children: [new TextRun({ text: `Email: ${data.email}` })], spacing: { after: 80 } }));
-  }
-
-  // Personal info
   const personalLines = [];
   if (data.citizenship) personalLines.push(`Гражданство: ${data.citizenship}`);
-  if (data.city) personalLines.push(`Место жительства: ${data.city}`);
+  if (data.city) personalLines.push(`Место проживания: ${data.city}`);
   if (data.relocation) personalLines.push(`Переезд: ${data.relocation}`);
   if (data.educationLevel) personalLines.push(`Образование: ${data.educationLevel}`);
   if (data.dob) personalLines.push(`Дата рождения: ${data.dob}`);
@@ -643,14 +699,33 @@ exportDocx?.addEventListener('click', async (e) => {
       spacing: { before: 120, after: 80 }
     }));
     for (const e of exp) {
-      const title = [e.company, e.role].filter(Boolean).join(' — ');
-      children.push(new Paragraph({ children: [new TextRun({ text: title, bold: true })], spacing: { after: 60 } }));
+      const period = [formatMonth(e.from), (e.to || '')].filter(Boolean).join(' — ');
+      const head = [e.role, e.company].filter(Boolean).join(', ');
+
+      if (period) children.push(new Paragraph({ children: [new TextRun({ text: `Период работы: ${period}` })], spacing: { after: 40 } }));
+      if (head) children.push(new Paragraph({ children: [new TextRun({ text: `Должность/организация: ${head}` })], spacing: { after: 40 } }));
+
       if (e.desc) {
-        for (const line of e.desc.split(/\n+/).filter(Boolean)) {
-          children.push(new Paragraph({ children: [new TextRun({ text: line })], spacing: { after: 40 } }));
+        const lines = e.desc.split(/\n+/).map(s => s.trim()).filter(Boolean);
+        if (lines.length >= 2) {
+          children.push(new Paragraph({ children: [new TextRun({ text: `Должностные обязанности и достижения:`, bold: true })], spacing: { after: 40 } }));
+          for (const l of lines) children.push(new Paragraph({ text: l.replace(/^[-•●]\s*/, ''), bullet: { level: 0 }, spacing: { after: 20 } }));
+        } else {
+          children.push(new Paragraph({ children: [new TextRun({ text: e.desc })], spacing: { after: 40 } }));
         }
       }
       children.push(new Paragraph({ text: "", spacing: { after: 60 } }));
+    }
+  }
+
+  if (skillsList.length) {
+    children.push(new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      children: [new TextRun({ text: "Профессиональные навыки", bold: true })],
+      spacing: { before: 120, after: 80 }
+    }));
+    for (const s of skillsList) {
+      children.push(new Paragraph({ text: s, bullet: { level: 0 }, spacing: { after: 20 } }));
     }
   }
 
@@ -663,9 +738,11 @@ exportDocx?.addEventListener('click', async (e) => {
     }));
     for (const e of edu) {
       const dates = [formatMonth(e.from), formatMonth(e.to)].filter(Boolean).join(' — ');
-      children.push(new Paragraph({ children: [new TextRun({ text: e.school, bold: true })], spacing: { after: 40 } }));
-      if (dates) children.push(new Paragraph({ children: [new TextRun({ text: dates })], spacing: { after: 60 } }));
-      else children.push(new Paragraph({ text: "", spacing: { after: 60 } }));
+      children.push(new Paragraph({ children: [new TextRun({ text: `Учебное заведение: ${e.school}`, bold: true })], spacing: { after: 40 } }));
+      if (e.faculty) children.push(new Paragraph({ children: [new TextRun({ text: `Факультет: ${e.faculty}` })], spacing: { after: 30 } }));
+      if (e.speciality) children.push(new Paragraph({ children: [new TextRun({ text: `Специальность: ${e.speciality}` })], spacing: { after: 30 } }));
+      if (dates) children.push(new Paragraph({ children: [new TextRun({ text: `Период: ${dates}` })], spacing: { after: 40 } }));
+      children.push(new Paragraph({ text: "", spacing: { after: 40 } }));
     }
   }
 
@@ -678,9 +755,8 @@ exportDocx?.addEventListener('click', async (e) => {
     }));
     for (const c of courses) {
       const tail = [c.org, c.year].filter(Boolean).join(' · ');
-      children.push(new Paragraph({ children: [new TextRun({ text: c.title, bold: true })], spacing: { after: 40 } }));
-      if (tail) children.push(new Paragraph({ children: [new TextRun({ text: tail })], spacing: { after: 60 } }));
-      else children.push(new Paragraph({ text: "", spacing: { after: 60 } }));
+      children.push(new Paragraph({ children: [new TextRun({ text: `Название курса: ${c.title}`, bold: true })], spacing: { after: 30 } }));
+      if (tail) children.push(new Paragraph({ children: [new TextRun({ text: `Детали: ${tail}` })], spacing: { after: 40 } }));
     }
   }
 
@@ -691,7 +767,7 @@ exportDocx?.addEventListener('click', async (e) => {
       spacing: { before: 120, after: 80 }
     }));
     for (const line of data.languages.split(/\n+/).filter(Boolean)) {
-      children.push(new Paragraph({ children: [new TextRun({ text: line })], spacing: { after: 40 } }));
+      children.push(new Paragraph({ children: [new TextRun({ text: line })], spacing: { after: 30 } }));
     }
   }
 
@@ -702,34 +778,12 @@ exportDocx?.addEventListener('click', async (e) => {
       spacing: { before: 120, after: 80 }
     }));
     for (const line of data.computerSkills.split(/\n+/).filter(Boolean)) {
-      children.push(new Paragraph({ children: [new TextRun({ text: line })], spacing: { after: 40 } }));
-    }
-  }
-
-  if (skillsList.length) {
-    children.push(new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun({ text: "Профессиональные навыки", bold: true })],
-      spacing: { before: 120, after: 80 }
-    }));
-    for (const s of skillsList) {
-      children.push(new Paragraph({ text: s, bullet: { level: 0 }, spacing: { after: 30 } }));
-    }
-  }
-
-  if (data.about) {
-    children.push(new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun({ text: "О себе", bold: true })],
-      spacing: { before: 120, after: 80 }
-    }));
-    for (const line of data.about.split(/\n+/).filter(Boolean)) {
-      children.push(new Paragraph({ children: [new TextRun({ text: line })], spacing: { after: 40 } }));
+      children.push(new Paragraph({ children: [new TextRun({ text: line })], spacing: { after: 30 } }));
     }
   }
 
   const additionalLines = [];
-  if (data.driverLicense) additionalLines.push(`Права: ${data.driverLicense}`);
+  if (data.driverLicense) additionalLines.push(`Водительские права: ${data.driverLicense}`);
   if (data.recommendations) additionalLines.push(`Рекомендации: ${data.recommendations}`);
   if (data.hobbies) additionalLines.push(`Свободное время: ${data.hobbies}`);
   if (data.personalQualities) additionalLines.push(`Личные качества: ${data.personalQualities}`);
@@ -741,7 +795,18 @@ exportDocx?.addEventListener('click', async (e) => {
       spacing: { before: 120, after: 80 }
     }));
     for (const line of additionalLines) {
-      children.push(new Paragraph({ children: [new TextRun({ text: line })], spacing: { after: 50 } }));
+      children.push(new Paragraph({ children: [new TextRun({ text: line })], spacing: { after: 40 } }));
+    }
+  }
+
+  if (data.about) {
+    children.push(new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      children: [new TextRun({ text: "О себе", bold: true })],
+      spacing: { before: 120, after: 80 }
+    }));
+    for (const line of data.about.split(/\n+/).filter(Boolean)) {
+      children.push(new Paragraph({ children: [new TextRun({ text: line })], spacing: { after: 30 } }));
     }
   }
 
@@ -756,7 +821,7 @@ exportDocx?.addEventListener('click', async (e) => {
       const link = (s.link || "").trim();
       children.push(new Paragraph({
         children: [new TextRun({ text: `${title}: `, bold: true }), new TextRun({ text: link })],
-        spacing: { after: 50 }
+        spacing: { after: 40 }
       }));
     }
   }

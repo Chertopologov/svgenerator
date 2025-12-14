@@ -52,11 +52,13 @@
       <section class="card form-card">
         <div class="card-head">
           <div class="card-title">Данные</div>
+          <div class="pill">Web3 UI</div>
         </div>
 
         <form id="resumeForm" onsubmit="return false;">
           <div class="accordion">
 
+            <!-- Основная информация -->
             <details open class="acc">
               <summary class="acc-head">
                 <span>Основная информация</span>
@@ -138,7 +140,7 @@
               </div>
             </details>
 
-
+            <!-- Личная информация -->
             <details open class="acc">
               <summary class="acc-head">
                 <span>Личная информация</span>
@@ -227,11 +229,11 @@
               </div>
             </details>
 
-
+            <!-- Опыт -->
             <details class="acc">
               <summary class="acc-head">
                 <span>Опыт работы</span>
-                <span class="acc-hint">компания и обязанности</span>
+                <span class="acc-hint">период, компания и обязанности</span>
               </summary>
               <div class="acc-body">
                 <div class="subblock-head">
@@ -242,7 +244,7 @@
               </div>
             </details>
 
-  
+            <!-- Проф. навыки -->
             <details class="acc">
               <summary class="acc-head">
                 <span>Профессиональные навыки</span>
@@ -256,10 +258,11 @@
               </div>
             </details>
 
+            <!-- Образование -->
             <details class="acc">
               <summary class="acc-head">
                 <span>Образование</span>
-                <span class="acc-hint">учебное заведение и период</span>
+                <span class="acc-hint">вуз, факультет, специальность, период</span>
               </summary>
               <div class="acc-body">
                 <div class="subblock-head">
@@ -270,7 +273,7 @@
               </div>
             </details>
 
-
+            <!-- Курсы -->
             <details class="acc">
               <summary class="acc-head">
                 <span>Курсы и тренинги</span>
@@ -285,7 +288,7 @@
               </div>
             </details>
 
-      
+            <!-- Языки/комп навыки -->
             <details class="acc">
               <summary class="acc-head">
                 <span>Иностранные языки и компьютерные навыки</span>
@@ -303,7 +306,7 @@
               </div>
             </details>
 
-  
+            <!-- Доп инфо -->
             <details class="acc">
               <summary class="acc-head">
                 <span>Дополнительная информация</span>
@@ -332,7 +335,7 @@
               </div>
             </details>
 
-          
+            <!-- О себе -->
             <details class="acc">
               <summary class="acc-head">
                 <span>О себе</span>
@@ -357,7 +360,7 @@
     </div>
   </main>
 
-
+  <!-- STEP 2 -->
   <main class="page step step-2 hidden" id="step2">
     <div class="layout">
       <aside class="side">
@@ -376,9 +379,7 @@
             <button type="button" id="backToEdit" class="btn btn-ghost">← Назад к заполнению</button>
           </div>
 
-          <div class="side-note">
-            Примечание: пустые поля не попадут в итоговый документ.
-          </div>
+          <div class="side-note">Пустые поля не попадут в итоговый документ.</div>
         </div>
       </aside>
 
