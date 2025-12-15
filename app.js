@@ -1,5 +1,37 @@
 const $ = (id) => document.getElementById(id);
 
+// Telegram Mini App (safe)
+const TG = window.Telegram?.WebApp;
+const IS_TG = !!TG;
+
+if (IS_TG) {
+  TG.ready();
+  TG.expand();
+
+  // Можно включить кнопку "Назад" в Telegram
+  TG.BackButton.onClick(() => {
+    // если есть showStep(1) — вернёмся на заполнение
+    if (typeof showStep === 'function') showStep(1);
+    else window.history.back();
+  });
+}
+
+function tgSync(step) {
+  if (!IS_TG) return;
+
+  if (step === 1) {
+    TG.BackButton.hide();
+    TG.MainButton.hide();
+  } else {
+    TG.BackButton.show();
+    TG.MainButton.setText('Скачать PDF');
+    TG.MainButton.show();
+    TG.MainButton.onClick(() => document.getElementById('exportPdf')?.click());
+  }
+}
+
+
+
 // ---------------- Helpers ----------------
 function escapeHtml(str) {
   if (!str) return '';
@@ -101,6 +133,7 @@ function showStep(n){
     renderPreview();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+  tgSync(n);
 }
 
 toPreviewBtn?.addEventListener('click', () => showStep(2));
