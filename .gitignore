@@ -1,0 +1,6 @@
+.env
+.env.*
+bot/.env
+bot/.env.*
+node_modules/
+bot/node_modules/
