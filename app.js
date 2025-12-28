@@ -1,23 +1,45 @@
+/* =========================
+   CV Creator — app.js
+   Stable + Telegram-native + autosave
+========================= */
+
 const $ = (id) => document.getElementById(id);
 
-// Telegram Mini App (safe)
+// ---------------- Telegram Mini App (safe) ----------------
 const TG = window.Telegram?.WebApp;
 const IS_TG = !!TG;
 
+function tgHaptic(type = 'light') {
+  if (!IS_TG) return;
+  try { TG.HapticFeedback?.impactOccurred(type); } catch (_) {}
+}
+
 if (IS_TG) {
+  document.body.classList.add('tg');
   TG.ready();
   TG.expand();
+}
 
-  // Можно включить кнопку "Назад" в Telegram
+// Один раз вешаем обработчики для TG кнопок (не копим!)
+let tgHandlersBound = false;
+function bindTelegramHandlersOnce() {
+  if (!IS_TG || tgHandlersBound) return;
+  tgHandlersBound = true;
+
   TG.BackButton.onClick(() => {
-    // если есть showStep(1) — вернёмся на заполнение
     if (typeof showStep === 'function') showStep(1);
     else window.history.back();
+  });
+
+  TG.MainButton.onClick(() => {
+    tgHaptic('light');
+    document.getElementById('exportPdf')?.click();
   });
 }
 
 function tgSync(step) {
   if (!IS_TG) return;
+  bindTelegramHandlersOnce();
 
   if (step === 1) {
     TG.BackButton.hide();
@@ -26,11 +48,8 @@ function tgSync(step) {
     TG.BackButton.show();
     TG.MainButton.setText('Скачать PDF');
     TG.MainButton.show();
-    TG.MainButton.onClick(() => document.getElementById('exportPdf')?.click());
   }
 }
-
-
 
 // ---------------- Helpers ----------------
 function escapeHtml(str) {
@@ -40,28 +59,26 @@ function escapeHtml(str) {
   );
 }
 
-function normalizeUrl(url){
+function normalizeUrl(url) {
   const v = (url || '').trim();
-  if(!v) return '';
+  if (!v) return '';
   if (!/^https?:\/\//i.test(v)) return 'https://' + v;
   return v;
 }
 
 // Expecting "m.Y" from flatpickr monthSelect
-function formatMonth(v){
+function formatMonth(v) {
   const s = (v || '').trim();
   if (!s) return '';
-  // already m.Y
-  if (/^\d{1,2}\.\d{4}$/.test(s)) return s;
-  // fallback YYYY-MM
-  if (/^\d{4}-\d{2}$/.test(s)) {
-    const [y,m] = s.split('-');
+  if (/^\d{1,2}\.\d{4}$/.test(s)) return s;       // m.Y
+  if (/^\d{4}-\d{2}$/.test(s)) {                  // YYYY-MM
+    const [y, m] = s.split('-');
     return `${m}.${y}`;
   }
   return s;
 }
 
-function splitSkills(text){
+function splitSkills(text) {
   const raw = (text || '').trim();
   if (!raw) return [];
   let parts = raw.split(/\n+/).flatMap(line => line.split(/[;,]+/));
@@ -76,10 +93,10 @@ function splitSkills(text){
       out.push(p);
     }
   }
-  return out.slice(0, 80);
+  return out.slice(0, 120);
 }
 
-function dataUrlToUint8Array(dataUrl){
+function dataUrlToUint8Array(dataUrl) {
   const base64 = dataUrl.split(',')[1] || '';
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
@@ -87,11 +104,11 @@ function dataUrlToUint8Array(dataUrl){
   return bytes;
 }
 
-// Convert multiline to UL if many lines
 function toListOrParagraph(text) {
   const raw = (text || '').trim();
   if (!raw) return '';
   const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
+
   if (lines.length >= 2) {
     return `<ul>${lines.map(l => `<li>${escapeHtml(l.replace(/^[-•●]\s*/, ''))}</li>`).join('')}</ul>`;
   }
@@ -120,26 +137,27 @@ function syncPreviewButton() {
   if (goStep2Btn) goStep2Btn.disabled = !ok;
 }
 
-function showStep(n){
+function showStep(n) {
   if (n === 2 && !canGoToPreview()) return;
 
   if (n === 1) {
-    step1.classList.remove('hidden');
-    step2.classList.add('hidden');
+    step1?.classList.remove('hidden');
+    step2?.classList.add('hidden');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } else {
-    step2.classList.remove('hidden');
-    step1.classList.add('hidden');
+    step2?.classList.remove('hidden');
+    step1?.classList.add('hidden');
     renderPreview();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+
   tgSync(n);
 }
 
-toPreviewBtn?.addEventListener('click', () => showStep(2));
-backToEditBtn?.addEventListener('click', () => showStep(1));
-goStep1Btn?.addEventListener('click', () => showStep(1));
-goStep2Btn?.addEventListener('click', () => showStep(2));
+toPreviewBtn?.addEventListener('click', () => { tgHaptic('light'); showStep(2); });
+backToEditBtn?.addEventListener('click', () => { tgHaptic('light'); showStep(1); });
+goStep1Btn?.addEventListener('click', () => { tgHaptic('light'); showStep(1); });
+goStep2Btn?.addEventListener('click', () => { tgHaptic('light'); showStep(2); });
 
 // ---------------- DOM ----------------
 const form = $('resumeForm');
@@ -171,15 +189,15 @@ const clearFormBtn = $('clearForm');
 const scrollUp = $('scrollUp');
 const scrollDown = $('scrollDown');
 
-// ---------------- Debounce ----------------
-let _t = null;
+// ---------------- Debounce render ----------------
+let _renderT = null;
 function debouncedRender() {
-  clearTimeout(_t);
-  _t = setTimeout(() => {
+  clearTimeout(_renderT);
+  _renderT = setTimeout(() => {
     syncPreviewButton();
-    // превью реально видно только на шаге 2, но рендерим всегда — безопасно
     renderPreview();
-  }, 120);
+    debouncedSave(); // автосейв вместе с вводом
+  }, 150);
 }
 
 // ---------------- Flatpickr month picker (safe) ----------------
@@ -192,7 +210,7 @@ function getMonthSelectPlugin() {
   );
 }
 
-function initMonthPicker(input){
+function initMonthPicker(input) {
   if (!input) return;
   if (input._flatpickr) return;
 
@@ -204,7 +222,7 @@ function initMonthPicker(input){
     const pluginFactory = getMonthSelectPlugin();
     if (pluginFactory) {
       window.flatpickr(input, {
-        plugins: [ pluginFactory({ shorthand: true, dateFormat: "m.Y", altFormat: "m.Y" }) ],
+        plugins: [pluginFactory({ shorthand: true, dateFormat: "m.Y", altFormat: "m.Y" })],
         allowInput: true,
       });
     }
@@ -257,9 +275,7 @@ function makeExperienceEntry() {
   `;
 
   initMonthPicker(row.querySelector('.exp-from'));
-  // для exp-to оставляем ввод свободным (можно "настоящее время")
-  // но если хочешь тоже picker — раскомментируй:
-  // initMonthPicker(row.querySelector('.exp-to'));
+  // exp-to оставляем свободным — можно вводить "настоящее время"
 
   row.querySelector('.remove').addEventListener('click', () => {
     row.remove();
@@ -306,34 +322,35 @@ function makeSocialEntry() {
 }
 
 addEducationBtn?.addEventListener('click', () => {
-  educationList.appendChild(makeEducationEntry());
+  tgHaptic('light');
+  educationList?.appendChild(makeEducationEntry());
   debouncedRender();
 });
 
 addExperienceBtn?.addEventListener('click', () => {
-  experienceList.appendChild(makeExperienceEntry());
+  tgHaptic('light');
+  experienceList?.appendChild(makeExperienceEntry());
   debouncedRender();
 });
 
 addCourseBtn?.addEventListener('click', () => {
-  coursesList.appendChild(makeCourseEntry());
+  tgHaptic('light');
+  coursesList?.appendChild(makeCourseEntry());
   debouncedRender();
 });
 
 addSocialBtn?.addEventListener('click', () => {
-  socials.appendChild(makeSocialEntry());
+  tgHaptic('light');
+  socials?.appendChild(makeSocialEntry());
   debouncedRender();
 });
 
-// Initial entries
-educationList?.appendChild(makeEducationEntry());
-experienceList?.appendChild(makeExperienceEntry());
-
 // ---------------- Template selection ----------------
 templateButtons.forEach(b => b.addEventListener('click', () => {
+  tgHaptic('light');
   templateButtons.forEach(x => x.classList.remove('active'));
   b.classList.add('active');
-  resumePreview.className = 'resume-preview ' + b.dataset.tmpl;
+  if (resumePreview) resumePreview.className = 'resume-preview ' + b.dataset.tmpl;
   debouncedRender();
 }));
 
@@ -344,6 +361,7 @@ photoInput?.addEventListener('change', () => {
 
   const reader = new FileReader();
   reader.onload = e => {
+    if (!photoPreview) return;
     photoPreview.src = e.target.result;
     photoPreview.style.display = 'block';
     photoPreview.dataset.hasPhoto = '1';
@@ -428,24 +446,23 @@ function renderPreview() {
   const { data, edu, exp, courses, soc, hasPhoto, photoSrc, skillsList } = collectData();
   const tmpl2 = resumePreview.classList.contains('template-2');
 
-  // Общие хелперы
   const only = (v) => (v || '').trim();
-  const kv = (k, v) => v ? `<div class="t2-kv-row"><span class="k">${escapeHtml(k)}:</span> <span class="v">${escapeHtml(v)}</span></div>` : '';
-  const ul = (arr) => arr && arr.length ? `<ul class="${tmpl2 ? 't2-list' : ''}">${arr.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul>` : '';
+  const ul = (arr, cls = '') =>
+    arr && arr.length ? `<ul class="${cls}">${arr.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul>` : '';
+
   const lines = (text) => {
     const raw = (text || '').trim();
     if (!raw) return '';
     const arr = raw.split('\n').map(s => s.trim()).filter(Boolean);
-    if (arr.length >= 2) return ul(arr.map(s => s.replace(/^[-•●]\s*/, '')));
+    if (arr.length >= 2) return ul(arr.map(s => s.replace(/^[-•●]\s*/, '')), tmpl2 ? 't2-list' : '');
     return `<p class="${tmpl2 ? '' : 'blockline'}">${escapeHtml(raw)}</p>`;
   };
 
   const name = only(data.name) || 'Ф.И.О.';
-  const pos  = only(data.position);
+  const pos = only(data.position);
 
-  // -------- TEMPLATE 2 (two column) --------
+  // ===== TEMPLATE 2 (two column) =====
   if (tmpl2) {
-    // LEFT blocks
     const personalLeft = [
       data.city ? `Место проживания: ${data.city}` : '',
       data.dob ? `Дата рождения: ${data.dob}` : '',
@@ -462,10 +479,12 @@ function renderPreview() {
       data.email ? `Email: ${data.email}` : '',
     ].filter(Boolean);
 
-    const languagesLeft = only(data.languages) ? data.languages.split('\n').map(s=>s.trim()).filter(Boolean) : [];
+    const languagesLeft = only(data.languages)
+      ? data.languages.split('\n').map(s => s.trim()).filter(Boolean)
+      : [];
+
     const skillsLeft = skillsList;
 
-    // RIGHT blocks
     const expHtml = exp.length ? `
       <div class="box">
         <div class="box-title">Опыт работы</div>
@@ -494,13 +513,14 @@ function renderPreview() {
         <div class="box-body">
           ${edu.map(e => {
             const dates = [formatMonth(e.from), formatMonth(e.to)].filter(Boolean).join(' — ');
-            const main = e.school ? escapeHtml(e.school) : '';
-            const sub = [e.faculty ? `Факультет: ${e.faculty}` : '', e.speciality ? `Специальность: ${e.speciality}` : '']
-              .filter(Boolean).join(' • ');
+            const sub = [
+              e.faculty ? `Факультет: ${e.faculty}` : '',
+              e.speciality ? `Специальность: ${e.speciality}` : ''
+            ].filter(Boolean).join(' • ');
             return `
               <div class="job">
                 <div class="job-head">
-                  <div>${main}</div>
+                  <div>${escapeHtml(e.school)}</div>
                   <div class="muted">${escapeHtml(dates)}</div>
                 </div>
                 ${sub ? `<div class="job-sub">${escapeHtml(sub)}</div>` : ''}
@@ -537,6 +557,7 @@ function renderPreview() {
     if (only(data.recommendations)) addLines.push(`Рекомендации: ${data.recommendations}`);
     if (only(data.hobbies)) addLines.push(`Свободное время: ${data.hobbies}`);
     if (only(data.personalQualities)) addLines.push(`Личные качества: ${data.personalQualities}`);
+
     const additionalHtml = addLines.length ? `
       <div class="box">
         <div class="box-title">Дополнительная информация</div>
@@ -555,36 +576,22 @@ function renderPreview() {
       <div class="sheet">
         <div class="t2">
           <div class="t2-left">
-            <div class="t2-photo">
-              ${hasPhoto ? `<img src="${photoSrc}" alt="Фото">` : ``}
-            </div>
-
+            <div class="t2-photo">${hasPhoto ? `<img src="${photoSrc}" alt="Фото">` : ``}</div>
             <div class="t2-name">${escapeHtml(name)}</div>
             ${pos ? `<div class="t2-pos">${escapeHtml(pos)}</div>` : ''}
 
             ${personalLeft.length ? `
               <h3>Личная информация</h3>
-              <div class="t2-kv">
-                ${personalLeft.map(x => `<div>${escapeHtml(x)}</div>`).join('')}
-              </div>
+              <div class="t2-kv">${personalLeft.map(x => `<div>${escapeHtml(x)}</div>`).join('')}</div>
             ` : ''}
 
             ${contactsLeft.length ? `
               <h3>Контакты</h3>
-              <div class="t2-kv">
-                ${contactsLeft.map(x => `<div>${escapeHtml(x)}</div>`).join('')}
-              </div>
+              <div class="t2-kv">${contactsLeft.map(x => `<div>${escapeHtml(x)}</div>`).join('')}</div>
             ` : ''}
 
-            ${languagesLeft.length ? `
-              <h3>Языки</h3>
-              ${ul(languagesLeft)}
-            ` : ''}
-
-            ${skillsLeft.length ? `
-              <h3>Навыки</h3>
-              ${ul(skillsLeft)}
-            ` : ''}
+            ${languagesLeft.length ? `<h3>Языки</h3>${ul(languagesLeft, 't2-list')}` : ''}
+            ${skillsLeft.length ? `<h3>Навыки</h3>${ul(skillsLeft, 't2-list')}` : ''}
           </div>
 
           <div class="t2-right">
@@ -600,9 +607,7 @@ function renderPreview() {
     return;
   }
 
-  // -------- TEMPLATE 1 (оставляем как было — классика “как на скрине”) --------
-  // Ничего не ломаем: твой текущий Template-1 рендер остаётся прежним
-  // (ниже — короткий вариант на основе уже сделанного)
+  // ===== TEMPLATE 1 =====
   const headerMeta = [
     data.employment ? `Занятость: ${data.employment}` : '',
     data.schedule ? `График работы: ${data.schedule}` : '',
@@ -642,6 +647,7 @@ function renderPreview() {
           ${period ? `<p class="blockline"><span class="label">Период работы:</span> ${escapeHtml(period)}</p>` : ''}
           ${head ? `<p class="blockline"><span class="label">Должность/организация:</span> ${escapeHtml(head)}</p>` : ''}
           ${desc}
+          <div style="height:10px"></div>
         `;
       }).join('')}
     </div>
@@ -664,6 +670,7 @@ function renderPreview() {
           ${e.faculty ? `<p class="blockline"><span class="label">Факультет:</span> ${escapeHtml(e.faculty)}</p>` : ''}
           ${e.speciality ? `<p class="blockline"><span class="label">Специальность:</span> ${escapeHtml(e.speciality)}</p>` : ''}
           ${dates ? `<p class="blockline"><span class="label">Период:</span> ${escapeHtml(dates)}</p>` : ''}
+          <div style="height:10px"></div>
         `;
       }).join('')}
     </div>
@@ -677,6 +684,7 @@ function renderPreview() {
         return `
           <p class="blockline"><span class="label">Название курса:</span> ${escapeHtml(c.title)}</p>
           ${tail ? `<p class="blockline"><span class="label">Детали:</span> ${escapeHtml(tail)}</p>` : ''}
+          <div style="height:10px"></div>
         `;
       }).join('')}
     </div>
@@ -710,14 +718,14 @@ function renderPreview() {
   `;
 }
 
-
 // ---------------- Listeners ----------------
 form?.addEventListener('input', debouncedRender);
 
-scrollUp?.addEventListener('click', () => resumePreview.scrollBy({ top: -220, behavior: 'smooth' }));
-scrollDown?.addEventListener('click', () => resumePreview.scrollBy({ top: 220, behavior: 'smooth' }));
+scrollUp?.addEventListener('click', () => resumePreview?.scrollBy({ top: -220, behavior: 'smooth' }));
+scrollDown?.addEventListener('click', () => resumePreview?.scrollBy({ top: 220, behavior: 'smooth' }));
 
 printBtn?.addEventListener('click', () => {
+  tgHaptic('light');
   renderPreview();
   window.print();
 });
@@ -725,6 +733,7 @@ printBtn?.addEventListener('click', () => {
 // ---------------- Export PDF (contrast safe) ----------------
 exportPdf?.addEventListener('click', async (e) => {
   e.preventDefault();
+  tgHaptic('light');
   renderPreview();
 
   if (typeof window.html2pdf === "undefined") {
@@ -732,7 +741,7 @@ exportPdf?.addEventListener('click', async (e) => {
     return;
   }
 
-  const sheet = resumePreview.querySelector('.sheet');
+  const sheet = resumePreview?.querySelector('.sheet');
   if (!sheet) return alert("Не найден лист резюме для экспорта.");
 
   const sheetClone = sheet.cloneNode(true);
@@ -774,6 +783,7 @@ exportPdf?.addEventListener('click', async (e) => {
 // ---------------- Export DOCX ----------------
 exportDocx?.addEventListener('click', async (e) => {
   e.preventDefault();
+  tgHaptic('light');
   renderPreview();
 
   if (!window.docx || !window.saveAs) {
@@ -856,10 +866,12 @@ exportDocx?.addEventListener('click', async (e) => {
       if (head) children.push(new Paragraph({ children: [new TextRun({ text: `Должность/организация: ${head}` })], spacing: { after: 40 } }));
 
       if (e.desc) {
-        const lines = e.desc.split(/\n+/).map(s => s.trim()).filter(Boolean);
-        if (lines.length >= 2) {
+        const descLines = e.desc.split(/\n+/).map(s => s.trim()).filter(Boolean);
+        if (descLines.length >= 2) {
           children.push(new Paragraph({ children: [new TextRun({ text: `Должностные обязанности и достижения:`, bold: true })], spacing: { after: 40 } }));
-          for (const l of lines) children.push(new Paragraph({ text: l.replace(/^[-•●]\s*/, ''), bullet: { level: 0 }, spacing: { after: 20 } }));
+          for (const l of descLines) {
+            children.push(new Paragraph({ text: l.replace(/^[-•●]\s*/, ''), bullet: { level: 0 }, spacing: { after: 20 } }));
+          }
         } else {
           children.push(new Paragraph({ children: [new TextRun({ text: e.desc })], spacing: { after: 40 } }));
         }
@@ -910,56 +922,6 @@ exportDocx?.addEventListener('click', async (e) => {
     }
   }
 
-  if (data.languages) {
-    children.push(new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun({ text: "Иностранные языки", bold: true })],
-      spacing: { before: 120, after: 80 }
-    }));
-    for (const line of data.languages.split(/\n+/).filter(Boolean)) {
-      children.push(new Paragraph({ children: [new TextRun({ text: line })], spacing: { after: 30 } }));
-    }
-  }
-
-  if (data.computerSkills) {
-    children.push(new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun({ text: "Компьютерные навыки", bold: true })],
-      spacing: { before: 120, after: 80 }
-    }));
-    for (const line of data.computerSkills.split(/\n+/).filter(Boolean)) {
-      children.push(new Paragraph({ children: [new TextRun({ text: line })], spacing: { after: 30 } }));
-    }
-  }
-
-  const additionalLines = [];
-  if (data.driverLicense) additionalLines.push(`Водительские права: ${data.driverLicense}`);
-  if (data.recommendations) additionalLines.push(`Рекомендации: ${data.recommendations}`);
-  if (data.hobbies) additionalLines.push(`Свободное время: ${data.hobbies}`);
-  if (data.personalQualities) additionalLines.push(`Личные качества: ${data.personalQualities}`);
-
-  if (additionalLines.length) {
-    children.push(new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun({ text: "Дополнительная информация", bold: true })],
-      spacing: { before: 120, after: 80 }
-    }));
-    for (const line of additionalLines) {
-      children.push(new Paragraph({ children: [new TextRun({ text: line })], spacing: { after: 40 } }));
-    }
-  }
-
-  if (data.about) {
-    children.push(new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun({ text: "О себе", bold: true })],
-      spacing: { before: 120, after: 80 }
-    }));
-    for (const line of data.about.split(/\n+/).filter(Boolean)) {
-      children.push(new Paragraph({ children: [new TextRun({ text: line })], spacing: { after: 30 } }));
-    }
-  }
-
   if (soc.length) {
     children.push(new Paragraph({
       heading: HeadingLevel.HEADING_1,
@@ -968,7 +930,7 @@ exportDocx?.addEventListener('click', async (e) => {
     }));
     for (const s of soc) {
       const title = (s.title || "Ссылка").trim();
-      const link = (s.link || "").trim();
+      const link = normalizeUrl(s.link || "");
       children.push(new Paragraph({
         children: [new TextRun({ text: `${title}: `, bold: true }), new TextRun({ text: link })],
         spacing: { after: 40 }
@@ -983,36 +945,208 @@ exportDocx?.addEventListener('click', async (e) => {
 
 // ---------------- Clear form ----------------
 function resetDynamicLists() {
-  educationList.innerHTML = '';
-  experienceList.innerHTML = '';
-  coursesList.innerHTML = '';
-  socials.innerHTML = '';
-  educationList.appendChild(makeEducationEntry());
-  experienceList.appendChild(makeExperienceEntry());
+  if (educationList) educationList.innerHTML = '';
+  if (experienceList) experienceList.innerHTML = '';
+  if (coursesList) coursesList.innerHTML = '';
+  if (socials) socials.innerHTML = '';
+
+  educationList?.appendChild(makeEducationEntry());
+  experienceList?.appendChild(makeExperienceEntry());
 }
 
 function resetPhoto() {
   const inp = $('photoInput');
   const img = $('photoPreview');
   const hint = $('photoHint');
-  inp.value = '';
-  img.removeAttribute('src');
-  img.style.display = 'none';
-  delete img.dataset.hasPhoto;
-  hint.style.display = 'flex';
+
+  if (inp) inp.value = '';
+  if (img) {
+    img.removeAttribute('src');
+    img.style.display = 'none';
+    delete img.dataset.hasPhoto;
+  }
+  if (hint) hint.style.display = 'flex';
 }
 
 clearFormBtn?.addEventListener('click', () => {
-  form.querySelectorAll('input, textarea, select').forEach(el => {
+  tgHaptic('light');
+
+  form?.querySelectorAll('input, textarea, select').forEach(el => {
     if (el.type === 'file') return;
     el.value = '';
   });
+
   resetDynamicLists();
   resetPhoto();
+
+  clearDraft(); // чистим автосейв
   debouncedRender();
 });
 
+// ---------------- Autosave draft (localStorage) ----------------
+const SAVE_KEY = 'cvcreator_draft_v1';
+let _saveT = null;
+
+function debouncedSave() {
+  clearTimeout(_saveT);
+  _saveT = setTimeout(saveDraft, 400);
+}
+
+function snapshotForm() {
+  const get = (id) => document.getElementById(id)?.value ?? '';
+
+  const soc = [...document.querySelectorAll('.soc-row')].map(r => ({
+    title: r.querySelector('.soc-title')?.value || '',
+    link: r.querySelector('.soc-link')?.value || '',
+  }));
+
+  const exp = [...document.querySelectorAll('.exp-row')].map(r => ({
+    from: r.querySelector('.exp-from')?.value || '',
+    to: r.querySelector('.exp-to')?.value || '',
+    company: r.querySelector('.exp-company')?.value || '',
+    role: r.querySelector('.exp-role')?.value || '',
+    desc: r.querySelector('.exp-desc')?.value || '',
+  }));
+
+  const edu = [...document.querySelectorAll('.edu-row')].map(r => ({
+    school: r.querySelector('.edu-school')?.value || '',
+    faculty: r.querySelector('.edu-faculty')?.value || '',
+    speciality: r.querySelector('.edu-speciality')?.value || '',
+    from: r.querySelector('.edu-from')?.value || '',
+    to: r.querySelector('.edu-to')?.value || '',
+  }));
+
+  const courses = [...document.querySelectorAll('.course-row')].map(r => ({
+    title: r.querySelector('.course-title')?.value || '',
+    org: r.querySelector('.course-org')?.value || '',
+    year: r.querySelector('.course-year')?.value || '',
+  }));
+
+  const photo = (photoPreview?.dataset?.hasPhoto === '1') ? (photoPreview?.src || '') : '';
+
+  const fields = {
+    fullName: get('fullName'),
+    position: get('position'),
+    employment: get('employment'),
+    schedule: get('schedule'),
+    businessTrips: get('businessTrips'),
+    salary: get('salary'),
+    phone: get('phone'),
+    email: get('email'),
+    city: get('city'),
+    relocation: get('relocation'),
+    citizenship: get('citizenship'),
+    dob: get('dob'),
+    gender: get('gender'),
+    maritalStatus: get('maritalStatus'),
+    children: get('children'),
+    educationLevel: get('educationLevel'),
+    skills: get('skills'),
+    languages: get('languages'),
+    computerSkills: get('computerSkills'),
+    driverLicense: get('driverLicense'),
+    recommendations: get('recommendations'),
+    hobbies: get('hobbies'),
+    personalQualities: get('personalQualities'),
+    about: get('about'),
+  };
+
+  return { v: 1, ts: Date.now(), fields, lists: { soc, exp, edu, courses }, photo };
+}
+
+function saveDraft() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(snapshotForm()));
+  } catch (_) {}
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
+}
+
+function restoreDraft() {
+  let raw = null;
+  try { raw = localStorage.getItem(SAVE_KEY); } catch (_) {}
+  if (!raw) return false;
+
+  let snap;
+  try { snap = JSON.parse(raw); } catch (_) { return false; }
+  if (!snap?.fields) return false;
+
+  const set = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val ?? '';
+  };
+
+  Object.entries(snap.fields).forEach(([k, v]) => set(k, v));
+
+  // photo
+  if (snap.photo && photoPreview) {
+    photoPreview.src = snap.photo;
+    photoPreview.style.display = 'block';
+    photoPreview.dataset.hasPhoto = '1';
+    if (photoHint) photoHint.style.display = 'none';
+  }
+
+  // dynamic lists
+  socials && (socials.innerHTML = '');
+  experienceList && (experienceList.innerHTML = '');
+  educationList && (educationList.innerHTML = '');
+  coursesList && (coursesList.innerHTML = '');
+
+  (snap.lists?.soc || []).forEach(s => {
+    const row = makeSocialEntry();
+    row.querySelector('.soc-title').value = s.title || '';
+    row.querySelector('.soc-link').value = s.link || '';
+    socials?.appendChild(row);
+  });
+
+  (snap.lists?.exp || []).forEach(e => {
+    const row = makeExperienceEntry();
+    row.querySelector('.exp-from').value = e.from || '';
+    row.querySelector('.exp-to').value = e.to || '';
+    row.querySelector('.exp-company').value = e.company || '';
+    row.querySelector('.exp-role').value = e.role || '';
+    row.querySelector('.exp-desc').value = e.desc || '';
+    experienceList?.appendChild(row);
+  });
+
+  (snap.lists?.edu || []).forEach(e => {
+    const row = makeEducationEntry();
+    row.querySelector('.edu-school').value = e.school || '';
+    row.querySelector('.edu-faculty').value = e.faculty || '';
+    row.querySelector('.edu-speciality').value = e.speciality || '';
+    row.querySelector('.edu-from').value = e.from || '';
+    row.querySelector('.edu-to').value = e.to || '';
+    educationList?.appendChild(row);
+  });
+
+  (snap.lists?.courses || []).forEach(c => {
+    const row = makeCourseEntry();
+    row.querySelector('.course-title').value = c.title || '';
+    row.querySelector('.course-org').value = c.org || '';
+    row.querySelector('.course-year').value = c.year || '';
+    coursesList?.appendChild(row);
+  });
+
+  // если вдруг списки пустые — добавим стартовые строки
+  if (educationList && educationList.children.length === 0) educationList.appendChild(makeEducationEntry());
+  if (experienceList && experienceList.children.length === 0) experienceList.appendChild(makeExperienceEntry());
+
+  return true;
+}
+
 // ---------------- Init ----------------
-syncPreviewButton();
-renderPreview();
-showStep(1);
+(function init() {
+  // если черновика нет — создаём начальные записи
+  const restored = restoreDraft();
+  if (!restored) {
+    educationList?.appendChild(makeEducationEntry());
+    experienceList?.appendChild(makeExperienceEntry());
+  }
+
+  syncPreviewButton();
+  renderPreview();
+  showStep(1);
+})();
+

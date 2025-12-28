@@ -549,3 +549,40 @@ select option{
     height: 160px;
   }
 }
+/* ==========================
+   Telegram native-feel
+========================== */
+:root{
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+}
+
+body.tg .topbar{ display:none; }
+
+/* безопасные отступы в TG + чуть плотнее */
+body.tg .page{
+  padding-top: max(10px, var(--safe-top));
+  padding-bottom: max(12px, var(--safe-bottom));
+}
+body.tg .center-wrap,
+body.tg .layout{ padding: 10px; }
+
+/* в TG лучше без sticky сайдбара (WebView иногда дергает) */
+body.tg .side-card{ position: static; }
+
+/* приятные клики */
+.btn, .acc-head, .photo-drop{
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* чтобы селекты/дропдауны читались контрастно (проблема из скринов) */
+select, option{
+  color: #e6eef8;
+  background: rgba(15, 23, 36, 0.98);
+}
+
+/* если где-то есть dropdown/списки поверх — увеличиваем контраст */
+.flatpickr-calendar{
+  color: #0b1220;
+}
+
